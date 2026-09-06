@@ -4,14 +4,15 @@ type Account = { name: string; email: string; currency: string; balance: number 
 type Transfer = { id: number; type: string; bank: string; destination: string; beneficiary: string; amount: number; currency: string; status: 'Pending' };
 const CURRENCIES = ['USD','CAD','GBP','EUR','NGN','GHS','ZAR','AED','ILS','JPY','TRY','SEK'];
 const OWNER_CODE = '2468';
-const key = 'apex-vercel-sandbox';
-
+// Versioned key prevents malformed data from an older Apex export from crashing the app on boot.
+const key = 'northbridge-trust-apex-sandbox-v2';
+const defaultAccount: Account = { name: 'Apex User', email: 'user@example.com', currency: 'USD', balance: 0 };
 function load<T>(fallback: T): T { try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; } }
 function App() {
-  const [account, setAccount] = useState<Account>(() => load({ name: 'Apex User', email: 'user@example.com', currency: 'USD', balance: 0 }));
+  const [account, setAccount] = useState<Account>(() => { const a = load<Account>(defaultAccount); return a && typeof a === 'object' && CURRENCIES.includes(a.currency) ? a : defaultAccount; });
   const [signedIn, setSignedIn] = useState(() => load(false));
-  const [page, setPage] = useState<'home'|'currency'|'dashboard'|'transactions'|'profile'|'owner'>(() => load('home'));
-  const [transfers, setTransfers] = useState<Transfer[]>(() => load([]));
+  const [page, setPage] = useState<'home'|'currency'|'dashboard'|'transactions'|'profile'|'owner'>(() => { const p = load('home'); return ['home','currency','dashboard','transactions','profile','owner'].includes(p as string) ? p as typeof page : 'home'; });
+  const [transfers, setTransfers] = useState<Transfer[]>(() => { const t = load<Transfer[]>([]); return Array.isArray(t) ? t : []; });
   const [modal, setModal] = useState<string | null>(null);
   const [step, setStep] = useState<'form'|'review'|'swc'|'wic'|'pending'>('form');
   const [form, setForm] = useState({ bank:'', destination:'', beneficiary:'', amount:'', currency:'USD' });
@@ -19,8 +20,8 @@ function App() {
   const [error, setError] = useState('');
   const [owner, setOwner] = useState(false);
   const [ownerCode, setOwnerCode] = useState('');
-  const money = useMemo(() => new Intl.NumberFormat(undefined,{style:'currency',currency:account.currency}), [account.currency]);
-  useEffect(() => { localStorage.setItem(key, JSON.stringify({account,signedIn,page,transfers})); }, [account,signedIn,page,transfers]);
+  const money = useMemo(() => new Intl.NumberFormat(undefined,{style:'currency',currency:CURRENCIES.includes(account.currency) ? account.currency : 'USD'}), [account.currency]);
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify({account,signedIn,page,transfers})); } catch {} }, [account,signedIn,page,transfers]);
   const signIn = () => { setSignedIn(true); setPage(account.currency ? 'dashboard' : 'currency'); };
   const resetTransfer = () => { setStep('form'); setCode(''); setError(''); setForm({bank:'',destination:'',beneficiary:'',amount:'',currency:account.currency}); };
   const openTransfer = (type:string) => { resetTransfer(); setForm(f => ({...f,currency:account.currency})); setModal(type); };
